@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(duna-global-registration)
+project(duna-cloud-tools)
 
 find_package(PCL 1.10 REQUIRED)
 find_package(OpenMP REQUIRED)
