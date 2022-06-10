@@ -65,8 +65,11 @@ int main(int argc, char **argv)
     pcl::search::KdTree<PointT>::Ptr kdtree(new pcl::search::KdTree<PointT>);
 
     pcl::NormalEstimation<PointT, PointT> ne;
+    
+    std::cout << "Computing normals...\n";
     ne.setSearchMethod(kdtree);
-    ne.setKSearch(25);
+    ne.setRadiusSearch(0.01f);
+    // ne.setKSearch(50);
 
     kdtree->setInputCloud(input_source);
     ne.setInputCloud(input_source);
@@ -100,29 +103,16 @@ int main(int argc, char **argv)
         }
     }
 
-    std::cout << "Keypts[0]: " << g_res.getKeyPointsIndicesAt(0)->size() << std::endl;
-    std::cout << "Keypts[1]: " << g_res.getKeyPointsIndicesAt(1)->size() << std::endl;
-
-    auto keypts0 = g_res.getKeyPointsIndicesAt(0);
-    auto keypts1 = g_res.getKeyPointsIndicesAt(1);
-
-    if (!keypts0 || !keypts0)
-    {
-        std::cerr << "No keypoints detected\n";
-        exit(0);
-    }
 
     pcl::Correspondences corrs;
-    pcl::Correspondences corrs_relative_to_feature;
-    if (g_res.estimateFeatureCorrespondence(0, 5, corrs) != 0)
-        std::cerr << "Pair 0,5 dont exist\n";
+    
 
     std::cout << "Computing Correspondences...\n";
 
     pcl::StopWatch timer;
     timer.reset();
     g_res.estimateFeatureCorrespondence(0, 1, corrs);
-    g_res.estimateFeatureCorrespondence(0, 1, corrs_relative_to_feature, false);
+    
 
     std::cout << "Found: " << corrs.size() << " Correspondences\n";
     std::cout << "Corr Estimate: " << timer.getTimeSeconds() << std::endl;
@@ -133,7 +123,7 @@ int main(int argc, char **argv)
     Eigen::Matrix4f transform;
     transform.setIdentity();
     timer.reset();
-    g_res.estimateFeatureTransform(0, 1, transform);
+    // g_res.estimateFeatureTransform(0, 1, transform);
     std::cout << "Transform Estimate: " << timer.getTimeSeconds() << std::endl;
 
     std::cout << "Estimated transform:\n"
@@ -172,11 +162,9 @@ int main(int argc, char **argv)
     pcl::io::savePCDFile(cloud_filename2 + "_full.pcd", *input_target, true);
 
     // // VISUALIZE
-    pcl::PointCloud<PointT>::Ptr keypts0_cloud(new pcl::PointCloud<PointT>);
-    pcl::PointCloud<PointT>::Ptr keypts1_cloud(new pcl::PointCloud<PointT>);
+    auto keypts_src = g_res.getKeyPointsAt(0);
+    auto keypts_tgt = g_res.getKeyPointsAt(1);
 
-    pcl::copyPointCloud(*input_source, *keypts0, *keypts0_cloud);
-    pcl::copyPointCloud(*input_target, *keypts1, *keypts1_cloud);
 
     pcl::visualization::PCLVisualizer viewer;
     viewer.addCoordinateSystem();
@@ -185,41 +173,17 @@ int main(int argc, char **argv)
     // viewer.createViewPort(0.5, 0, 1, 1, vp1);
 
     viewer.addPointCloud<PointT>(input_source, "input0", 0);
-    viewer.addPointCloud<PointT>(keypts0_cloud, "keypts0", 0);
+    viewer.addPointCloud<PointT>(keypts_src, "keypts0", 0);
+    viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 1.0, "input0");
     viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "keypts0");
     viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0, 1.0, 0, "keypts0");
 
     viewer.addPointCloud<PointT>(input_target, "input1", 0);
-    viewer.addPointCloud<PointT>(keypts1_cloud, "keypts1", 0);
-    viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "keypts1");
-    viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0, 1.0, 0, "keypts1");
+    viewer.addPointCloud<PointT>(keypts_tgt, "keypts1", 0);
     viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 0, "input1");
-
-    // viewer.addPointCloud<PointIntensity>(keypts1,"cloud1");
-
-    // for (int i = 0; i < corrs_relative_to_feature.size(); i+=50)
-    // {
-    //     const int &src_idx = corrs_relative_to_feature[i].index_query;
-    //     const int &tgt_idx = corrs_relative_to_feature[i].index_match;
-
-    //     // Print some correspondences
-    //     const auto &src_feature = features0->points[src_idx];
-    //     const auto &tgt_feature = features1->points[tgt_idx];
-
-    //     for (int i = 0; i < 33; ++i)
-    //     {
-    //         std::cout << src_feature.histogram[i] << " ";
-    //     }
-    //     std::cout << "\n";
-    //     for (int i = 0; i < 33; ++i)
-    //     {
-    //         std::cout << tgt_feature.histogram[i] << " ";
-    //     }
-
-    //     std::cout << "\nDistance: " << corrs[i].distance;
-
-    //     std::cout << "\n\n";
-    // }
+    viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "keypts1");
+    viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 0, "keypts1");
+    
 
     for (int i = 0; i < corrs.size(); i += 2)
     {
@@ -227,16 +191,15 @@ int main(int argc, char **argv)
         const int &src_idx = corrs[i].index_query;
         const int &tgt_idx = corrs[i].index_match;
 
-        const PointT &src_pt = input_source->points[src_idx];
-        const PointT &tgt_pt = input_target->points[tgt_idx];
+        const PointT &src_pt = keypts_src->points[src_idx];
+        const PointT &tgt_pt = keypts_tgt->points[tgt_idx];
 
-        viewer.addLine(src_pt, tgt_pt, 0.4, 0, 0, std::string("arrow") + std::to_string(i));
+        viewer.addLine(src_pt, tgt_pt, 0.8, 0.2, 0, std::string("arrow") + std::to_string(i));
     }
 
     while (!viewer.wasStopped())
     {
         viewer.spin();
-        // histogram_viewer.spin();
     }
 
     return 0;

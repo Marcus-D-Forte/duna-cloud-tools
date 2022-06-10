@@ -21,7 +21,7 @@ class GlobalRegistration
 {
 public:
     using PointT = pcl::PointNormal;
-    using KeyPointT = pcl::PointXYZI;
+    using KeyPointT = pcl::PointNormal;
 
     using PointCloudT = pcl::PointCloud<PointT>;
     using PointCloudTPtr = typename PointCloudT::Ptr;
@@ -61,7 +61,7 @@ public:
     int computeKeypointsAt(const int index);
     int computeFeaturesAt(const int index);
 
-    int estimateFeatureCorrespondence(const int i0, const int i1, pcl::Correspondences &corrs, bool relative_to_input = true);
+    int estimateFeatureCorrespondence(const int i0, const int i1, pcl::Correspondences &corrs);
     int estimateFeatureTransform(const int i0, const int i1, Eigen::Matrix4f &transform);
 
     PointCloudKeyPointConstPtr getKeyPointsAt(const int index)
@@ -69,11 +69,11 @@ public:
         return m_keypoints[index];
     }
 
-    // Return keypoint indices
-    pcl::IndicesConstPtr getKeyPointsIndicesAt(const int index)
-    {
-        return m_keypoints_indices[index];
-    }
+    // // Return keypoint indices
+    // pcl::IndicesConstPtr getKeyPointsIndicesAt(const int index)
+    // {
+    //     return m_keypoints_indices[index];
+    // }
 
     PointCloudFeatureConstPtr getFeatureCloudAt(const int index)
     {
@@ -88,7 +88,7 @@ private:
     std::unordered_map<int, PointCloudKeyPointPtr> m_keypoints;
     std::unordered_map<int, PointCloudFeaturePtr> m_feature_clouds;
 
-    std::unordered_map<int, pcl::IndicesPtr> m_keypoints_indices;
+    // std::unordered_map<int, pcl::IndicesPtr> m_keypoints_indices;
 
     omp_lock_t map_lock;
 };
